@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/ProductCatalog.Api/ProductCatalog.Api.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <Compile Include="../Shared/PostgresFixture.cs" Link="Support/PostgresFixture.cs" />
+  </ItemGroup>
+</Project>

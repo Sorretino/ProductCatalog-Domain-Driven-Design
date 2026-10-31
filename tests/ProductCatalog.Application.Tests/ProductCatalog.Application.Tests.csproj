@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/ProductCatalog.Application/ProductCatalog.Application.csproj" />
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+</Project>

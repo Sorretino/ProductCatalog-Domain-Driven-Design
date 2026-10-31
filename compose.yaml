@@ -1,0 +1,72 @@
+name: product-catalog
+
+x-api-environment: &api-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  ConnectionStrings__Catalog: Host=postgres;Port=5432;Database=product_catalog;Username=product_catalog;Password=${POSTGRES_PASSWORD:?Execute scripts/Initialize-Local.ps1};Timeout=5
+  Authentication__Authority: http://localhost:8080/realms/product-catalog
+  Authentication__MetadataAddress: http://identity:8080/realms/product-catalog/.well-known/openid-configuration
+  Authentication__Audience: product-catalog
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: product_catalog
+      POSTGRES_USER: product_catalog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Execute scripts/Initialize-Local.ps1}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U product_catalog -d product_catalog"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  identity:
+    image: quay.io/keycloak/keycloak:26.8.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: local-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Execute scripts/Initialize-Local.ps1}
+      CATALOG_CLIENT_SECRET: ${CATALOG_CLIENT_SECRET:?Execute scripts/Initialize-Local.ps1}
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./deploy/keycloak/product-catalog-realm.json:/opt/keycloak/data/import/product-catalog-realm.json:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "bash -c 'exec 3<>/dev/tcp/localhost/9000; printf \"GET /health/ready HTTP/1.0\r\n\r\n\" >&3; grep -q \"200\" <&3'"
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 30
+
+  migrate:
+    build: .
+    image: product-catalog-api:local
+    command: ["--migrate"]
+    environment: *api-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    image: product-catalog-api:local
+    environment: *api-environment
+    ports:
+      - "127.0.0.1:5080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      identity:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
